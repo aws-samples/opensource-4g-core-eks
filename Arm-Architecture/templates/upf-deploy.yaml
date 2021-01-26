@@ -1,0 +1,54 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-upf-deployment
+  namespace: open5gs  
+  labels:
+    epc-mode: upf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: upf
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "sx.upf.open5gs.service", "multus-int": "ipvlan-multus-sub-1-up" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[  { "name": "ipvlan-multus-sub-2", "interface": "net2" },
+                                           { "name": "ipvlan-multus-sub-1-up", "interface": "net1" }
+                                        ]'  
+      labels:
+        epc-mode: upf
+    spec:
+      nodeSelector:
+        nodegroup: user-plane     
+      containers:
+        - name: upf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-c"]
+          args:
+          - ip tuntap add name ogstun mode tun;
+            ip addr add 10.45.0.1/16 dev ogstun;
+            sysctl -w net.ipv6.conf.all.disable_ipv6=1;
+            ip link set ogstun up;
+            sh -c "echo 1 > /proc/sys/net/ipv4/ip_forward";
+            iptables -t nat -A POSTROUTING -s 10.45.0.0/16 ! -o ogstun -j MASQUERADE;
+            open5gs-upfd -c /open5gs/config-map/upf.yaml;
+          volumeMounts:
+          - name: open5gs-upf-config
+            mountPath: /open5gs/config-map/upf.yaml
+            subPath: "upf.yaml"
+          - mountPath: /dev/net/tun
+            name: dev-net-tun            
+      volumes:
+        - name: open5gs-upf-config
+          configMap:
+            name: open5gs-upf-config
+        - name: dev-net-tun
+          hostPath:
+            path: /dev/net/tun

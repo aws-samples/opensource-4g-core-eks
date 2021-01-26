@@ -1,0 +1,41 @@
+# Default values for open5gs-epc-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+open5gs:
+  image:
+    repository: 
+    pullPolicy: IfNotPresent
+    tag: ""
+
+webui:
+  image:
+    repository: 
+    pullPolicy: IfNotPresent
+    tag: ""
+
+#This uses the documentDB uri, you need to add open5gs DB to the uri  
+mongo:
+  uri: "mongodb://DOCUMENT_DB_USER:DOCUMENT_DB_PASSWD@DOCUMENT_DB_URL:27017/open5gs?ssl=true&tlsCAFile=/root/rds-combined-ca-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+  caSecretName: mongodb-ca
+
+apn: internet  
+
+diameter:
+  caSecretName: diameter-ca
+
+hss:
+  tlsSecretName: hss-tls
+
+mme:
+  tlsSecretName: mme-tls
+  mcc: 208
+  mnc: 93
+  tac: 7
+  networkName: Open5GS
+
+pcrf:
+  tlsSecretName: pcrf-tls  
+
+smf:
+  tlsSecretName: smf-tls 

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open5gs-sgwu-config
+  namespace: open5gs 
+  labels:
+    epc-mode: sgwu
+data:
+  sgwu.yaml: |
+    logger:
+        file: /var/log/open5gs/sgwu.log
+
+    parameter:
+        no_ipv6: true
+
+    sgwu:
+        gtpu:
+           dev: net2
+        pfcp:
+           dev: net1
+
+    #sgwc:
+    #  pfcp:
+    #    - name: sgwcPFCP-open5gs.service.open5gs

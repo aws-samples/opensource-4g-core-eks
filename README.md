@@ -1,11 +1,8 @@
-## My Project
+## Opensource 4G Core
 
-TODO: Fill this README out!
+This repo contains the code templates that was used in the Opensource Mobile Packet Core Implementation on Amazon EKS blog post.
 
-Be sure to:
-
-* Change the title in this README
-* Edit your repository description on GitHub
+***N.B - You are required to build the container images yourself and push to your ECR.***
 
 ## Security
 

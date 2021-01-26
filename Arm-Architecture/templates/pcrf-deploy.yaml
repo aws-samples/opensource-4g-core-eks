@@ -1,0 +1,60 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-pcrf-deployment
+  namespace: open5gs
+  labels:
+    epc-mode: pcrf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: pcrf
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "gx.pcrf.open5gs.service", "multus-int": "ipvlan-multus-sub-1-cp" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[ { "name": "ipvlan-multus-sub-1-cp", "interface": "net1" }
+                                        ]'    
+      labels:
+        epc-mode: pcrf
+    spec:
+      nodeSelector:
+        nodegroup: control-plane 
+      containers:
+        - name: pcrf
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["open5gs-pcrfd", "-c", "/open5gs/config-map/pcrf.yaml"]
+          volumeMounts:
+          - name: open5gs-pcrf-config
+            mountPath: /open5gs/config-map/pcrf.yaml
+            subPath: "pcrf.yaml"
+          - name: open5gs-pcrf-diameter
+            mountPath: /open5gs/config-map/diameter-pcrf.conf
+            subPath: "diameter-pcrf.conf"
+          - mountPath: "/root/"
+            name: mongo-ca-cert
+            readOnly: true  
+          - mountPath: "/open5gs/diameter-ca/"
+            name: diameter-ca
+          - mountPath: "/open5gs/tls/"
+            name: pcrf-tls                                    
+      volumes:
+        - name: open5gs-pcrf-config
+          configMap:
+            name: open5gs-pcrf-config
+        - name: open5gs-pcrf-diameter
+          configMap:
+            name: open5gs-pcrf-diameter
+        - name: mongo-ca-cert
+          secret:
+            secretName: {{ .Values.mongo.caSecretName }}       
+        - name: diameter-ca
+          secret:
+            secretName: {{ .Values.diameter.caSecretName }}    
+        - name: pcrf-tls
+          secret:
+            secretName: {{ .Values.pcrf.tlsSecretName }}                 

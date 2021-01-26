@@ -1,0 +1,3 @@
+Status after deployment:
+
+kubectl --namespace {{ .Release.Namespace }} get all

@@ -1,0 +1,40 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-sgwc-deployment
+  namespace: open5gs
+  labels:
+    epc-mode: sgwc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: sgwc
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "s11.sgwc.open5gs.service", "multus-int": "ipvlan-multus-sub-1-cp" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[  { "name": "ipvlan-multus-sub-1-cp", "interface": "net1" }
+                                        ]'      
+      labels:
+        epc-mode: sgwc
+    spec:
+      nodeSelector:
+        nodegroup: control-plane   
+      containers:
+      - name: sgwc
+        image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+        imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+        - open5gs-sgwcd -c /open5gs/config-map/sgwc.yaml;
+        volumeMounts:
+          - name: open5gs-sgwc-config
+            mountPath: /open5gs/config-map/sgwc.yaml
+            subPath: "sgwc.yaml"               
+      volumes:
+        - name: open5gs-sgwc-config
+          configMap:
+            name: open5gs-sgwc-config

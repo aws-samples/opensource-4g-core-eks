@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multus-secondary-ip-ec2-mapping-operator
+  namespace: kube-system
+  labels:
+    app: multus-secondary-ip-ec2-mapping
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multus-secondary-ip-ec2-mapping
+  template:
+    metadata:
+      labels:
+        app: multus-secondary-ip-ec2-mapping
+    spec:
+      containers:
+      - name: shell-operator
+        image: { AWS_SEC_IP_CONTROLLER_IMAGE }
+      serviceAccountName: multus-sec-ip-operator-acct

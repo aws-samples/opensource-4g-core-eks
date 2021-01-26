@@ -1,0 +1,56 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-smf-deployment
+  namespace: open5gs
+  labels:
+    epc-mode: smf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: smf
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "s5.smf.open5gs.service", "multus-int": "ipvlan-multus-sub-1-cp" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[  { "name": "ipvlan-multus-sub-1-cp", "interface": "net1" }
+                                        ]'       
+      labels:
+        epc-mode: smf
+    spec:
+      nodeSelector:
+        nodegroup: control-plane    
+      containers:
+      - name: smf
+        image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+        imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args:
+        - open5gs-smfd -c /open5gs/config-map/smf.yaml;
+        volumeMounts:
+          - name: open5gs-smf-config
+            mountPath: /open5gs/config-map/smf.yaml
+            subPath: "smf.yaml"
+          - name: open5gs-smf-diameter
+            mountPath: /open5gs/config-map/diameter-smf.conf
+            subPath: "diameter-smf.conf" 
+          - mountPath: "/open5gs/diameter-ca/"
+            name: diameter-ca
+          - mountPath: "/open5gs/tls/"
+            name: smf-tls                                         
+      volumes:
+        - name: open5gs-smf-config
+          configMap:
+            name: open5gs-smf-config
+        - name: open5gs-smf-diameter
+          configMap:
+            name: open5gs-smf-diameter     
+        - name: diameter-ca
+          secret:
+            secretName: {{ .Values.diameter.caSecretName }}   
+        - name: smf-tls
+          secret:
+            secretName: {{ .Values.smf.tlsSecretName }}                   

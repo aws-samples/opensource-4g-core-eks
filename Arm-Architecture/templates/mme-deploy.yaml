@@ -1,0 +1,54 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-mme-deployment
+  namespace: open5gs
+  labels:
+    epc-mode: mme
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: mme
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "s6a.mme.open5gs.service", "multus-int": "ipvlan-multus-sub-1-cp" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[ { "name": "ipvlan-multus-sub-1-cp", "interface": "net1" }
+                                        ]'
+      labels:
+        epc-mode: mme
+    spec:
+      nodeSelector:
+        nodegroup: control-plane   
+      containers:
+      - name: mme
+        image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+        imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+        command: ["open5gs-mmed", "-c", "/open5gs/config-map/mme.yaml"]
+        volumeMounts:
+        - name: open5gs-mme-config
+          mountPath: /open5gs/config-map/mme.yaml
+          subPath: "mme.yaml"
+        - name: open5gs-mme-diameter
+          mountPath: /open5gs/config-map/diameter-mme.conf
+          subPath: "diameter-mme.conf"
+        - mountPath: "/open5gs/diameter-ca/"
+          name: diameter-ca
+        - mountPath: "/open5gs/tls/"
+          name: mme-tls         
+      volumes:
+        - name: open5gs-mme-config
+          configMap:
+            name: open5gs-mme-config
+        - name: open5gs-mme-diameter
+          configMap:
+            name: open5gs-mme-diameter
+        - name: diameter-ca
+          secret:
+            secretName: {{ .Values.diameter.caSecretName }}  
+        - name: mme-tls
+          secret:
+            secretName: {{ .Values.mme.tlsSecretName }}                

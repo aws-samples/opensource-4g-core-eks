@@ -1,0 +1,725 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Amazon EKS Arm architecture Multus ready workernode group and Auto ConfigMap update
+
+Mappings:
+  ServicePrincipals:
+    aws-cn:
+      ec2: ec2.amazonaws.com.cn
+    aws:
+      ec2: ec2.amazonaws.com
+  LayerArn:
+    ap-northeast-1:
+      kubectl: "arn:aws:lambda:ap-northeast-1:903779448426:layer:eks-kubectl-layer:30"
+    ap-northeast-2:
+      kubectl: "arn:aws:lambda:ap-northeast-2:903779448426:layer:eks-kubectl-layer:2"
+    ap-southeast-1:
+      kubectl: "arn:aws:lambda:ap-southeast-1:903779448426:layer:eks-kubectl-layer:2"
+    ap-southeast-2:
+      kubectl: "arn:aws:lambda:ap-southeast-2:903779448426:layer:eks-kubectl-layer:2"
+    ca-central-1:
+      kubectl: "arn:aws:lambda:ca-central-1:903779448426:layer:eks-kubectl-layer:1"
+    us-east-1:
+      kubectl: "arn:aws:lambda:us-east-1:903779448426:layer:eks-kubectl-layer:2"
+    us-west-1:
+      kubectl: "arn:aws:lambda:us-west-1:903779448426:layer:eks-kubectl-layer:1"
+    us-west-2:
+      kubectl: "arn:aws:lambda:us-west-2:903779448426:layer:eks-kubectl-layer:2"
+    us-east-2:
+      kubectl: "arn:aws:lambda:us-east-2:903779448426:layer:eks-kubectl-layer:3"
+    eu-central-1:
+      kubectl: "arn:aws:lambda:eu-central-1:903779448426:layer:eks-kubectl-layer:2"
+    eu-west-1:
+      kubectl: "arn:aws:lambda:eu-west-1:903779448426:layer:eks-kubectl-layer:2"
+    eu-north-1:
+      kubectl: "arn:aws:lambda:eu-north-1:903779448426:layer:eks-kubectl-layer:1"
+    sa-east-1:
+      kubectl: "arn:aws:lambda:sa-east-1:903779448426:layer:eks-kubectl-layer:1"
+    cn-north-1:
+      kubectl: "arn:aws-cn:lambda:cn-north-1:937788672844:layer:eks-kubectl-layer:2"
+    cn-northwest-1:
+      kubectl: "arn:aws-cn:lambda:cn-northwest-1:937788672844:layer:eks-kubectl-layer:2"
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: CFN stack of Infra (EKS, subnets and etc)
+        Parameters:
+          - InfraStackName
+          - EksClusterName
+      - Label:
+          default: Common Worker Node Configuration
+        Parameters:
+          - NodeInstanceType
+          - NodeImageIdSSMParam
+          - NodeImageId
+          - NodeVolumeSize
+          - KeyName
+      - Label:
+          default: WorkerNodeGroup1 (CP) Configuration
+        Parameters:
+          - NodeGroup1Name
+          - NodeAutoScalingGroup1MinSize
+          - NodeAutoScalingGroup1DesiredCapacity
+          - NodeAutoScalingGroup1MaxSize
+          - BootstrapArguments1
+      - Label:
+          default: WorkerNodeGroup2 (UP) Configuration
+        Parameters:
+          - NodeGroup2Name
+          - NodeAutoScalingGroup2MinSize
+          - NodeAutoScalingGroup2DesiredCapacity
+          - NodeAutoScalingGroup2MaxSize
+          - BootstrapArguments2
+      - Label:
+          default: Multus Lambda Function
+        Parameters:
+          - Attach2ndENILambdaS3Bucket
+          - Attach2ndENILambdaS3Key
+
+Parameters:
+  BootstrapArguments1:
+    Type: String
+    Default: "--kubelet-extra-args '--node-labels=nodegroup=control-plane'"
+    Description: "Arguments to pass to the bootstrap script. See files/bootstrap.sh in https://github.com/awslabs/amazon-eks-ami"
+  BootstrapArguments2:
+    Type: String
+    Default: "--kubelet-extra-args '--node-labels=nodegroup=user-plane'"
+    Description: "Arguments to pass to the bootstrap script. See files/bootstrap.sh in https://github.com/awslabs/amazon-eks-ami"
+  KeyName:
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Description: The EC2 Key Pair to allow SSH access to the instances
+  NodeImageId:
+    Type: String
+    Default: ""
+    Description: (Optional) Specify your own custom image ID. This value overrides any AWS Systems Manager Parameter Store value specified above.
+  NodeImageIdSSMParam:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/eks/optimized-ami/1.18/amazon-linux-2-arm64/recommended/image_id
+    Description: AWS Systems Manager Parameter Store parameter of the AMI ID for the worker node instances.
+  NodeInstanceType:
+    Type: String
+    Default: c6g.xlarge
+    AllowedValues:
+      - c6g.medium
+      - c6g.large
+      - c6g.xlarge
+      - c6g.2xlarge
+      - c6g.4xlarge
+      - c6g.8xlarge
+      - c6g.12xlarge
+      - c6g.16xlarge
+      - c6g.metal
+      - c6gd.medium
+      - c6gd.large
+      - c6gd.xlarge
+      - c6gd.2xlarge
+      - c6gd.4xlarge
+      - c5d.18xlarge
+      - c6gd.8xlarge
+      - c6gd.12xlarge
+      - c6gd.16xlarge
+      - c6gd.metal
+      - c6gn.medium
+      - c6gn.large
+      - c6gn.xlarge
+      - c6gn.2xlarge
+      - c6gn.4xlarge
+      - c6gn.8xlarge
+      - c6gn.12xlarge
+      - c6gn.16xlarge
+      - m6g.medium
+      - m6g.large
+      - m6g.xlarge
+      - m6g.2xlarge
+      - m6g.4xlarge
+      - m6g.8xlarge
+      - m6g.12xlarge
+      - m6g.16xlarge
+      - m6g.metal
+      - m6gd.medium
+      - m6gd.large
+      - m6gd.xlarge
+      - m6gd.2xlarge
+      - m6gd.4xlarge
+      - m6gd.8xlarge
+      - m6gd.12xlarge
+      - m6gd.16xlarge
+      - m6gd.metal
+      - a1.medium
+      - a1.large
+      - a1.xlarge
+      - a1.2xlarge
+      - a1.4xlarge
+      - a1.metal
+    ConstraintDescription: Must be a valid EC2 instance type
+    Description: EC2 instance type for the node instances
+  NodeVolumeSize:
+    Type: Number
+    Default: 50
+    Description: Node volume size
+  NodeAutoScalingGroup1DesiredCapacity:
+    Type: Number
+    Default: 1
+    Description: Desired capacity of Node Group ASG.
+  NodeAutoScalingGroup1MaxSize:
+    Type: Number
+    Default: 1
+    Description: Maximum size of Node Group ASG. Set to at least 1 greater than NodeAutoScalingGroupDesiredCapacity.
+  NodeAutoScalingGroup1MinSize:
+    Type: Number
+    Default: 1
+    Description: Minimum size of Node Group ASG.
+  NodeGroup1Name:
+    Type: String
+    Default: "ng1-control-plane"
+    Description: Unique identifier for the Node Group.
+  NodeAutoScalingGroup2DesiredCapacity:
+    Type: Number
+    Default: 1
+    Description: Desired capacity of Node Group ASG.
+  NodeAutoScalingGroup2MaxSize:
+    Type: Number
+    Default: 1
+    Description: Maximum size of Node Group ASG. Set to at least 1 greater than NodeAutoScalingGroupDesiredCapacity.
+  NodeAutoScalingGroup2MinSize:
+    Type: Number
+    Default: 1
+    Description: Minimum size of Node Group ASG.
+  NodeGroup2Name:
+    Type: String
+    Default: "ng2-user-plane"
+    Description: Unique identifier for the Node Group.
+  Attach2ndENILambdaS3Bucket:
+    Type: String
+    Description: Specify S3 Bucket(directory) where you locate Lambda function (Attach2ndENI function)
+    Default: ""
+  Attach2ndENILambdaS3Key:
+    Type: String
+    Description: Specify S3 Key(filename) of your Lambda Function (Attach2ndENI)
+    Default: "lambda_function.zip"
+  InfraStackName:
+    Description: Name of an active CloudFormation stack that contains Open5gs Infrastructure.
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "Open5gsInfra"
+  EksClusterName:
+    Description: Name of EKS Cluster created by Infra CFN.
+    Type: String
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "eks-Open5gsInfra"
+
+Conditions:
+  HasNodeImageId: !Not
+    - "Fn::Equals":
+        - Ref: NodeImageId
+        - ""
+
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  NodeInstanceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - !FindInMap [ServicePrincipals, !Ref "AWS::Partition", ec2]
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSCloudFormationFullAccess"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+      Path: /
+
+# NodeRole for EC2 API Call
+  Ec2ApiAccessPolicy:
+    Type: "AWS::IAM::Policy"
+    DependsOn: NodeInstanceRole
+    Properties:
+      PolicyName: Ec2ApiAccessPolicy
+      Roles: [
+          !Ref NodeInstanceRole
+        ]
+      PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: [
+                "ec2:AssignPrivateIpAddresses",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribeNetworkInterfaceAttribute",
+                "ec2:DescribeSubnets",
+                "ec2:ModifyInstanceAttribute"
+              ]
+              Resource: "*"
+
+  Route53AccessPolicy:
+    Type: "AWS::IAM::Policy"
+    DependsOn: NodeInstanceRole
+    Properties:
+      PolicyName: Route53AcessPolicy
+      Roles: [
+          !Ref NodeInstanceRole
+        ]
+      PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: [
+                "route53:GetHostedZone",
+                "route53:ChangeResourceRecordSets",
+                "route53:ListResourceRecordSets",
+                "route53:ListHostedZones",
+                "route53:ListHostedZonesByName"
+              ]
+              Resource: "*"
+
+  NodeInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: /
+      Roles:
+        - Ref: NodeInstanceRole
+
+  NodeSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Security group for all nodes in the cluster
+      Tags:
+        - Key: !Sub kubernetes.io/cluster/${EksClusterName}
+          Value: owned
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-VpcId"
+
+  NodeSecurityGroupIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow node to communicate with each other
+      FromPort: 0
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      ToPort: 65535
+
+  NodeSecurityGroupIngressForVpcIps:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      CidrIp:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-VpcCidr"
+      Description: Allow node to communicate with each other in VPC
+      FromPort: 0
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: "-1"
+      ToPort: 65535
+
+  ClusterControlPlaneSecurityGroupIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow pods to communicate with the cluster API Server
+      FromPort: 443
+      GroupId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-EksControlSecurityGroup"
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+      ToPort: 443
+
+  ControlPlaneEgressToNodeSecurityGroup:
+    Type: "AWS::EC2::SecurityGroupEgress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow the cluster control plane to communicate with worker Kubelet and pods
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      FromPort: 1025
+      GroupId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-EksControlSecurityGroup"
+      IpProtocol: tcp
+      ToPort: 65535
+
+  ControlPlaneEgressToNodeSecurityGroupOn443:
+    Type: "AWS::EC2::SecurityGroupEgress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow the cluster control plane to communicate with pods running extension API servers on port 443
+      DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      FromPort: 443
+      GroupId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-EksControlSecurityGroup"
+      IpProtocol: tcp
+      ToPort: 443
+
+  NodeSecurityGroupFromControlPlaneIngress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow worker Kubelets and pods to receive communication from the cluster control plane
+      FromPort: 1025
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-EksControlSecurityGroup"
+      ToPort: 65535
+
+  NodeSecurityGroupFromControlPlaneOn443Ingress:
+    Type: "AWS::EC2::SecurityGroupIngress"
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow pods running extension API servers on port 443 to receive communication from cluster control plane
+      FromPort: 443
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Fn::ImportValue:
+          !Sub "${InfraStackName}-EksControlSecurityGroup"
+      ToPort: 443
+
+  NodeLaunchConfig1:
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    Properties:
+      AssociatePublicIpAddress: "false"
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: !Ref NodeVolumeSize
+            VolumeType: gp2
+      IamInstanceProfile: !Ref NodeInstanceProfile
+      ImageId: !If
+        - HasNodeImageId
+        - Ref: NodeImageId
+        - Ref: NodeImageIdSSMParam
+      InstanceType: !Ref NodeInstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - Ref: NodeSecurityGroup
+      UserData: !Base64
+        "Fn::Sub": |
+          #!/bin/bash
+          set -o xtrace
+          /etc/eks/bootstrap.sh ${EksClusterName} ${BootstrapArguments1}
+          echo "net.ipv4.conf.default.rp_filter = 0" | tee -a /etc/sysctl.conf
+          echo "net.ipv4.conf.all.rp_filter = 0" | tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          sleep 45
+          ls /sys/class/net/ > /tmp/ethList;cat /tmp/ethList |while read line ; do sudo ifconfig $line up; done
+          grep eth /tmp/ethList |while read line ; do echo "ifconfig $line up" >> /etc/rc.d/rc.local; done
+          systemctl enable rc-local
+          chmod +x /etc/rc.d/rc.local
+
+  NodeLaunchConfig2:
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    Properties:
+      AssociatePublicIpAddress: "false"
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            VolumeSize: !Ref NodeVolumeSize
+            VolumeType: gp2
+      IamInstanceProfile: !Ref NodeInstanceProfile
+      ImageId: !If
+        - HasNodeImageId
+        - Ref: NodeImageId
+        - Ref: NodeImageIdSSMParam
+      InstanceType: !Ref NodeInstanceType
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - Ref: NodeSecurityGroup
+      UserData: !Base64
+        "Fn::Sub": |
+          #!/bin/bash
+          set -o xtrace
+          /etc/eks/bootstrap.sh ${EksClusterName} ${BootstrapArguments2}
+          echo "net.ipv4.conf.default.rp_filter = 0" | tee -a /etc/sysctl.conf
+          echo "net.ipv4.conf.all.rp_filter = 0" | tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          sleep 45
+          ls /sys/class/net/ > /tmp/ethList;cat /tmp/ethList |while read line ; do sudo ifconfig $line up; done
+          grep eth /tmp/ethList |while read line ; do echo "ifconfig $line up" >> /etc/rc.d/rc.local; done
+          systemctl enable rc-local
+          chmod +x /etc/rc.d/rc.local
+
+  NodeGroup1:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      DesiredCapacity: !Ref NodeAutoScalingGroup1DesiredCapacity
+      LaunchConfigurationName: !Ref NodeLaunchConfig1
+      MaxSize: !Ref NodeAutoScalingGroup1MaxSize
+      MinSize: !Ref NodeAutoScalingGroup1MinSize
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: "true"
+          Value: !Sub ${EksClusterName}-${NodeGroup1Name}-Node
+        - Key: !Sub kubernetes.io/cluster/${EksClusterName}
+          PropagateAtLaunch: "true"
+          Value: owned
+      VPCZoneIdentifier: [Fn::ImportValue: !Sub "${InfraStackName}-PrivateSubnetAz1"]
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: "1"
+        MinInstancesInService: !Ref NodeAutoScalingGroup1DesiredCapacity
+        PauseTime: PT5M
+
+  NodeGroup2:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    Properties:
+      DesiredCapacity: !Ref NodeAutoScalingGroup2DesiredCapacity
+      LaunchConfigurationName: !Ref NodeLaunchConfig2
+      MaxSize: !Ref NodeAutoScalingGroup2MaxSize
+      MinSize: !Ref NodeAutoScalingGroup2MinSize
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: "true"
+          Value: !Sub ${EksClusterName}-${NodeGroup2Name}-Node
+        - Key: !Sub kubernetes.io/cluster/${EksClusterName}
+          PropagateAtLaunch: "true"
+          Value: owned
+      VPCZoneIdentifier: [Fn::ImportValue: !Sub "${InfraStackName}-PrivateSubnetAz1"]
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: "1"
+        MinInstancesInService: !Ref NodeAutoScalingGroup2DesiredCapacity
+        PauseTime: PT5M
+# End of NodeGroup Creation
+
+# LifeCycleHook for AutoScalingGroup (NodeGroup)
+## Ec2Ins LcHook is for ENI Attach Lambda Call
+  LchookEc2InsNg1:
+    Type: "AWS::AutoScaling::LifecycleHook"
+    Properties:
+      AutoScalingGroupName: !Ref NodeGroup1
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_LAUNCHING"
+      DefaultResult: "ABANDON"
+      HeartbeatTimeout: "300"
+## Ec2Term LcHook is for Auto Drainer
+  LchookEc2TermNg1:
+    Type: "AWS::AutoScaling::LifecycleHook"
+    Properties:
+      AutoScalingGroupName: !Ref NodeGroup1
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      DefaultResult: "CONTINUE"
+      HeartbeatTimeout: "300"
+## Ec2Ins LcHook is for ENI Attach Lambda Call
+  LchookEc2InsNg2:
+    Type: "AWS::AutoScaling::LifecycleHook"
+    Properties:
+      AutoScalingGroupName: !Ref NodeGroup2
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_LAUNCHING"
+      DefaultResult: "ABANDON"
+      HeartbeatTimeout: "300"
+
+## Ec2Term LcHook is for Auto Drainer
+  LchookEc2TermNg2:
+    Type: "AWS::AutoScaling::LifecycleHook"
+    Properties:
+      AutoScalingGroupName: !Ref NodeGroup2
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      DefaultResult: "CONTINUE"
+      HeartbeatTimeout: "300"
+
+# Lambda Creation
+  RoleLambdaAttach2ndEniCfn:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /
+  PolicyLambdaAttach2ndEniCfn:
+    Type: "AWS::IAM::Policy"
+    DependsOn: RoleLambdaAttach2ndEniCfn
+    Properties:
+      PolicyName: LambdaAttach2ndEniCfn
+      Roles: [
+          !Ref RoleLambdaAttach2ndEniCfn
+        ]
+      PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: [
+                "ec2:CreateNetworkInterface",
+                "ec2:DescribeInstances",
+                "ec2:DetachNetworkInterface",
+                "ec2:ModifyNetworkInterfaceAttribute",
+                "autoscaling:CompleteLifecycleAction",
+                "ec2:DeleteTags",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:CreateTags",
+                "ec2:DeleteNetworkInterface",
+                "ec2:AttachNetworkInterface",
+                "autoscaling:DescribeAutoScalingGroups",
+                "ec2:TerminateInstances"
+              ]
+              Resource: "*"
+            - Effect: Allow
+              Action: [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ]
+              Resource: "arn:aws:logs:*:*:*"
+            - Effect: Allow
+              Action: "logs:CreateLogGroup"
+              Resource: "arn:aws:logs:*:*:*"
+
+  LambdaAttach2ndENI:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Runtime: "python2.7"
+      Handler: "lambda_function.lambda_handler"
+      Role: !GetAtt RoleLambdaAttach2ndEniCfn.Arn
+      Code:
+        S3Bucket: !Ref Attach2ndENILambdaS3Bucket
+        S3Key: !Ref Attach2ndENILambdaS3Key
+      Timeout: "60"
+      Environment:
+        Variables:
+          SubnetId1:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSubnet1Az1"
+          SubnetId2:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSubnet2Az1"
+          SecGroupId1:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSecurityGroup"
+          SecGroupId2:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSecurityGroup"
+# End of Lambda
+
+# CloudWatch Event Trigger
+  NewInstanceEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      EventPattern:
+        source:
+          - "aws.autoscaling"
+        detail-type:
+          - "EC2 Instance-launch Lifecycle Action"
+        detail:
+          AutoScalingGroupName:
+            - !Ref NodeGroup1
+            - !Ref NodeGroup2
+      Targets:
+        -
+          Arn: !GetAtt LambdaAttach2ndENI.Arn
+          Id: LambdaAttach2ndENI
+  PermissionForEventsToInvokeLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName:
+        Ref: "LambdaAttach2ndENI"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn:
+        Fn::GetAtt:
+          - "NewInstanceEventRule"
+          - "Arn"
+
+  LambdaReStartFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3, json
+          import cfnresponse
+          asg_client = boto3.client('autoscaling')
+          ec2_client = boto3.client('ec2')
+
+          def handler (event, context):
+              AutoScalingGroupName = event['ResourceProperties']['AsgName']
+              asg_response = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[AutoScalingGroupName])
+              instance_ids = []
+
+              for i in asg_response['AutoScalingGroups']:
+                for k in i['Instances']:
+                  instance_ids.append(k['InstanceId'])
+
+              if instance_ids != []:
+                ec2_client.terminate_instances(
+                  InstanceIds = instance_ids
+                )
+              responseValue = 1
+              responseData = {}
+              responseData['Data'] = responseValue
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "CustomResourcePhysicalID")
+
+      Handler: index.handler
+      Runtime: "python3.6"
+      Timeout: "60"
+      Role: !GetAtt RoleLambdaAttach2ndEniCfn.Arn
+
+  AutoRebootNg1:
+    Type: Custom::CustomResource
+    DependsOn: NodeGroup1
+    Properties:
+      ServiceToken: !GetAtt 'LambdaReStartFunction.Arn'
+      AsgName: !Ref NodeGroup1
+
+  AutoRebootNg2:
+    Type: Custom::CustomResource
+    DependsOn: NodeGroup2
+    Properties:
+      ServiceToken: !GetAtt 'LambdaReStartFunction.Arn'
+      AsgName: !Ref NodeGroup2
+
+  # Custom Resource
+  ConfigMapUpdate:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        # serverless app from all regoins should be able to import this ApplicationId from 'us-east-1' across accounts.
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:903779448426:applications/eks-auth-update-hook
+        SemanticVersion: 1.0.0
+      Parameters:
+        ClusterName:
+          Fn::ImportValue:
+            !Sub "${InfraStackName}-EksCluster"
+        LambdaRoleArn:
+          Fn::ImportValue:
+            !Sub "${InfraStackName}-EksAdminRoleForLambdaArn"
+        LambdaLayerKubectlArn: !FindInMap
+          - LayerArn
+          - !Ref "AWS::Region"
+          - kubectl
+        NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
+        FunctionName: !Sub "eks-auth-update-hook-${AWS::StackName}"
+
+  UpdateCM:
+    Type: Custom::UpdateConfigMap
+    Properties:
+      ServiceToken: !GetAtt ConfigMapUpdate.Outputs.LambdaFuncArn
+
+Outputs:
+  NodeInstanceRole:
+    Description: The node instance role
+    Value: !GetAtt NodeInstanceRole.Arn
+
+  NodeSecurityGroup:
+    Description: The security group for the node group
+    Value: !Ref NodeSecurityGroup

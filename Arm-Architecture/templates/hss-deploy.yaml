@@ -1,0 +1,59 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: open5gs-hss-deployment
+  labels:
+    epc-mode: hss
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      epc-mode: hss
+  template:
+    metadata:
+      annotations:
+          route53-service-name: '[
+                                  { "name": "s6a.hss.open5gs.service", "multus-int": "ipvlan-multus-sub-1-cp" }
+                               ]'
+          k8s.v1.cni.cncf.io/networks: '[ { "name": "ipvlan-multus-sub-1-cp", "interface": "net1" }
+                                        ]'      
+      labels:
+        epc-mode: hss
+    spec:
+      nodeSelector:
+        nodegroup: control-plane
+      containers:
+        - name: hss
+          image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
+          imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
+          command: ["open5gs-hssd", "-c", "/open5gs/config-map/hss.yaml"]
+          volumeMounts:
+          - name: open5gs-hss-config
+            mountPath: /open5gs/config-map/hss.yaml
+            subPath: "hss.yaml"
+          - name: open5gs-hss-diameter
+            mountPath: /open5gs/config-map/diameter-hss.conf
+            subPath: "diameter-hss.conf"    
+          - mountPath: "/root/"
+            name: mongo-ca-cert
+            readOnly: true             
+          - mountPath: "/open5gs/diameter-ca/"
+            name: diameter-ca
+          - mountPath: "/open5gs/tls/"
+            name: hss-tls                   
+      volumes:
+        - name: open5gs-hss-config
+          configMap:
+            name: open5gs-hss-config
+        - name: open5gs-hss-diameter
+          configMap:
+            name: open5gs-hss-diameter
+        - name: mongo-ca-cert
+          secret:
+            secretName: {{ .Values.mongo.caSecretName }}            
+        - name: diameter-ca
+          secret:
+            secretName: {{ .Values.diameter.caSecretName }}  
+        - name: hss-tls
+          secret:
+            secretName: {{ .Values.hss.tlsSecretName }}                                               

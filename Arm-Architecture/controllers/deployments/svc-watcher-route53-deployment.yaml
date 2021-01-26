@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multus-route53-service-operator
+  namespace: kube-system
+  labels:
+    app: multus-route53-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multus-route53-service
+  template:
+    metadata:
+      labels:
+        app: multus-route53-service
+    spec:
+      containers:
+      - name: shell-operator
+        image: { SVC_DISCOVERY_CONTROLLER_IMAGE }
+      serviceAccountName: multus-service-route53-acct
