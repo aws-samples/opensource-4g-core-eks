@@ -15,12 +15,9 @@ data:
            dev: net1
         gtpu:
            dev: net2
-        pdn:
+        subnet:
           - addr: 10.45.0.1/16
             apn: {{ .Values.apn }}
-        dns:
-          - 8.8.8.8
-          - 8.8.4.4
     #smf:
     #  pfcp:
     #  - name: smfPFCP-open5gs.service.open5gs
