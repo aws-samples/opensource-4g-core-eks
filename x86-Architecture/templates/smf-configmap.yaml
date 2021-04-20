@@ -18,9 +18,11 @@ data:
            dev: eth0
         gtpc:
            dev: net1
+        gtpu:
+           dev: net1           
         pfcp:
            dev: net1
-        pdn:
+        subnet:
          - addr: 10.45.0.1/16
            apn: {{ .Values.apn }}
         dns:
