@@ -32,6 +32,7 @@ RUN apt-get update && \
         netbase \
         net-tools \
         iptables \
+        dnsutils \        
         pkg-config && \
    apt-get clean && \
    git clone -b v2.2.6 --recursive https://github.com/open5gs/open5gs && \

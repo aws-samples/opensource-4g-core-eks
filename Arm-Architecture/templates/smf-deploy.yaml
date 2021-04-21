@@ -29,7 +29,10 @@ spec:
         imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
         command: ["/bin/sh", "-c"]
         args:
-        - open5gs-smfd -c /open5gs/config-map/smf.yaml;
+        - until nslookup gx.pcrf.open5gs.service; do echo waiting for pcrf DNS record to be ready; done;
+          until nslookup sx.upf.open5gs.service; do echo waiting for upf DNS record to be ready; done;
+          sleep 10;
+          open5gs-smfd -c /open5gs/config-map/smf.yaml;
         volumeMounts:
           - name: open5gs-smf-config
             mountPath: /open5gs/config-map/smf.yaml

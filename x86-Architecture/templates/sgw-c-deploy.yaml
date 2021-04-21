@@ -29,7 +29,9 @@ spec:
         imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
         command: ["/bin/sh", "-c"]
         args:
-        - open5gs-sgwcd -c /open5gs/config-map/sgwc.yaml;
+        - until nslookup sx.sgwu.open5gs.service; do echo waiting for sgwu DNS record to be ready; done;
+          sleep 10;
+          open5gs-sgwcd -c /open5gs/config-map/sgwc.yaml;
         volumeMounts:
           - name: open5gs-sgwc-config
             mountPath: /open5gs/config-map/sgwc.yaml
