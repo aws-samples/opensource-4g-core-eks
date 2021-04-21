@@ -26,7 +26,11 @@ spec:
         - name: hss
           image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
           imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
-          command: ["open5gs-hssd", "-c", "/open5gs/config-map/hss.yaml"]
+          command: ["/bin/sh", "-c"]
+          args:
+          - until nslookup s6a.mme.open5gs.service; do echo waiting for mme DNS record to be ready; done;
+            sleep 10;
+            open5gs-hssd -c /open5gs/config-map/hss.yaml
           volumeMounts:
           - name: open5gs-hss-config
             mountPath: /open5gs/config-map/hss.yaml

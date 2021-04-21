@@ -27,7 +27,11 @@ spec:
         - name: pcrf
           image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
           imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
-          command: ["open5gs-pcrfd", "-c", "/open5gs/config-map/pcrf.yaml"]
+          command: ["/bin/sh", "-c"]
+          args:
+          - until nslookup s5.smf.open5gs.service; do echo waiting for smf DNS record to be ready; done;
+            sleep 10;
+            open5gs-pcrfd -c /open5gs/config-map/pcrf.yaml
           volumeMounts:
           - name: open5gs-pcrf-config
             mountPath: /open5gs/config-map/pcrf.yaml
