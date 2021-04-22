@@ -1,0 +1,1020 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: srslte-config
+  labels:
+    epc-mode: hss
+data:
+  enb.conf: |
+      #####################################################################
+      #                   srsENB configuration file
+      #####################################################################
+      
+      #####################################################################
+      # eNB configuration
+      #
+      # enb_id:         20-bit eNB identifier.
+      # mcc:            Mobile Country Code
+      # mnc:            Mobile Network Code
+      # mme_addr:       IP address of MME for S1 connnection
+      # gtp_bind_addr:  Local IP address to bind for GTP connection
+      # s1c_bind_addr:  Local IP address to bind for S1AP connection
+      # n_prb:          Number of Physical Resource Blocks (6,15,25,50,75,100)
+      # tm:             Transmission mode 1-4 (TM1 default)
+      # nof_ports:      Number of Tx ports (1 port default, set to 2 for TM2/3/4)
+      #
+      #####################################################################
+      [enb]
+      enb_id = 0x19B
+      mcc = {{MCC}}
+      mnc = {{MNC}}
+      mme_addr = {{MME_ADDR}}
+      gtp_bind_addr = {{GTP_BIND_ADDR}}
+      s1c_bind_addr = {{S1C_BIND_ADDR}}
+      n_prb = 50
+      #tm = 4
+      #nof_ports = 2
+      
+      #####################################################################
+      # eNB configuration files 
+      #
+      # sib_config:  SIB1, SIB2 and SIB3 configuration file 
+      # note: when enabling mbms, use the sib.conf.mbsfn configuration file which includes SIB13
+      # rr_config:   Radio Resources configuration file 
+      # drb_config:  DRB configuration file 
+      #####################################################################
+      [enb_files]
+      sib_config = sib.conf
+      rr_config  = rr.conf
+      drb_config = drb.conf
+      
+      #####################################################################
+      # RF configuration
+      #
+      # dl_earfcn: EARFCN code for DL (only valid if a single cell is configured in rr.conf)
+      # tx_gain: Transmit gain (dB). 
+      # rx_gain: Optional receive gain (dB). If disabled, AGC if enabled
+      #
+      # Optional parameters:
+      # dl_freq:            Override DL frequency corresponding to dl_earfcn
+      # ul_freq:            Override UL frequency corresponding to dl_earfcn (must be set if dl_freq is set)
+      # device_name:        Device driver family.
+      #                     Supported options: "auto" (uses first found), "UHD", "bladeRF", "soapy" or "zmq".
+      # device_args:        Arguments for the device driver. Options are "auto" or any string.
+      #                     Default for UHD: "recv_frame_size=9232,send_frame_size=9232"
+      #                     Default for bladeRF: ""
+      # time_adv_nsamples:  Transmission time advance (in number of samples) to compensate for RF delay
+      #                     from antenna to timestamp insertion.
+      #                     Default "auto". B210 USRP: 100 samples, bladeRF: 27.
+      #####################################################################
+      [rf]
+      #dl_earfcn = 3350
+      tx_gain = 80
+      rx_gain = 40
+      device_name = zmq
+      device_args = fail_on_disconnect=true,tx_port=tcp://*:2000,rx_port=tcp://localhost:2001,id=enb,base_srate=23.04e6
+      
+      #device_name = auto
+      
+      # For best performance in 2x2 MIMO and >= 15 MHz use the following device_args settings:
+      #     USRP B210: num_recv_frames=64,num_send_frames=64
+      #     And for 75 PRBs, also append ",master_clock_rate=15.36e6" to the device args
+      
+      # For best performance when BW<5 MHz (25 PRB), use the following device_args settings:
+      #     USRP B210: send_frame_size=512,recv_frame_size=512
+      
+      #device_args = auto
+      #time_adv_nsamples = auto
+      
+      # Example for ZMQ-based operation with TCP transport for I/Q samples
+      #device_name = zmq
+      #device_args = fail_on_disconnect=true,tx_port=tcp://*:2000,rx_port=tcp://localhost:2001,id=enb,base_srate=23.04e6
+      
+      #####################################################################
+      # Packet capture configuration
+      #
+      # MAC Packets are captured to file in the compact format decoded by 
+      # the Wireshark mac-lte-framed dissector and with DLT 147. 
+      # To use the dissector, edit the preferences for DLT_USER to 
+      # add an entry with DLT=147, Payload Protocol=mac-lte-framed.
+      # For more information see: https://wiki.wireshark.org/MAC-LTE
+      #
+      # Please note that this setting will by default only capture MAC
+      # frames on dedicated channels, and not SIB.  You have to build with
+      # WRITE_SIB_PCAP enabled in srsenb/src/stack/mac/mac.cc if you want
+      # SIB to be part of the MAC pcap file.
+      #
+      # S1AP Packets are captured to file in the compact format decoded by 
+      # the Wireshark s1ap dissector and with DLT 150. 
+      # To use the dissector, edit the preferences for DLT_USER to 
+      # add an entry with DLT=150, Payload Protocol=s1ap.
+      #
+      # mac_enable:   Enable MAC layer packet captures (true/false)
+      # mac_filename: File path to use for packet captures
+      # s1ap_enable:   Enable or disable the PCAP.
+      # s1ap_filename: File name where to save the PCAP.
+      #
+      #####################################################################
+      [pcap]
+      enable = false
+      filename = /tmp/enb.pcap
+      s1ap_enable = false
+      s1ap_filename = /tmp/enb_s1ap.pcap
+      
+      #####################################################################
+      # Log configuration
+      #
+      # Log levels can be set for individual layers. "all_level" sets log
+      # level for all layers unless otherwise configured.
+      # Format: e.g. phy_level = info
+      #
+      # In the same way, packet hex dumps can be limited for each level.
+      # "all_hex_limit" sets the hex limit for all layers unless otherwise
+      # configured.
+      # Format: e.g. phy_hex_limit = 32
+      #
+      # Logging layers: rf, phy, phy_lib, mac, rlc, pdcp, rrc, gtpu, s1ap, stack, all
+      # Logging levels: debug, info, warning, error, none
+      #
+      # filename: File path to use for log output. Can be set to stdout
+      #           to print logs to standard output
+      # file_max_size: Maximum file size (in kilobytes). When passed, multiple files are created.
+      #                If set to negative, a single log file will be created.
+      #####################################################################
+      [log]
+      all_level = warning
+      all_hex_limit = 32
+      filename = /tmp/enb.log
+      file_max_size = -1
+      
+      [gui]
+      enable = false
+      
+      #####################################################################
+      # Scheduler configuration options
+      #
+      # max_aggr_level:    Optional maximum aggregation level index (l=log2(L) can be 0, 1, 2 or 3)
+      # pdsch_mcs:         Optional fixed PDSCH MCS (ignores reported CQIs if specified)
+      # pdsch_max_mcs:     Optional PDSCH MCS limit 
+      # pusch_mcs:         Optional fixed PUSCH MCS (ignores reported CQIs if specified)
+      # pusch_max_mcs:     Optional PUSCH MCS limit 
+      # min_nof_ctrl_symbols: Minimum number of control symbols 
+      # max_nof_ctrl_symbols: Maximum number of control symbols 
+      #
+      #####################################################################
+      [scheduler]
+      #max_aggr_level   = -1
+      #pdsch_mcs        = -1
+      #pdsch_max_mcs    = -1
+      #pusch_mcs        = -1
+      #pusch_max_mcs    = 16
+      #min_nof_ctrl_symbols = 1
+      #max_nof_ctrl_symbols = 3
+      
+      #####################################################################
+      # eMBMS configuration options
+      #
+      # enable:               Enable MBMS transmission in the eNB
+      # m1u_multiaddr:        Multicast addres the M1-U socket will register to
+      # m1u_if_addr:          Address of the inteferface the M1-U interface will listen for multicast packets.
+      # mcs:                  Modulation and Coding scheme for MBMS traffic.
+      #
+      #####################################################################
+      [embms]
+      #enable = false
+      #m1u_multiaddr = 239.255.0.1
+      #m1u_if_addr = 127.0.1.201
+      #mcs = 20
+      
+      
+      
+      #####################################################################
+      # Channel emulator options:
+      # enable:            Enable/Disable internal Downlink/Uplink channel emulator
+      #
+      # -- AWGN Generator
+      # awgn.enable:       Enable/disable AWGN generator
+      # awgn.snr:          Target SNR in dB
+      #
+      # -- Fading emulator
+      # fading.enable:     Enable/disable fading simulator
+      # fading.model:      Fading model + maximum doppler (E.g. none, epa5, eva70, etu300, etc)
+      #
+      # -- Delay Emulator     delay(t) = delay_min + (delay_max - delay_min) * (1 + sin(2pi*t/period)) / 2
+      #                       Maximum speed [m/s]: (delay_max - delay_min) * pi * 300 / period
+      # delay.enable:      Enable/disable delay simulator
+      # delay.period_s:    Delay period in seconds.
+      # delay.init_time_s: Delay initial time in seconds.
+      # delay.maximum_us:  Maximum delay in microseconds
+      # delay.minumum_us:  Minimum delay in microseconds
+      #
+      # -- Radio-Link Failure (RLF) Emulator
+      # rlf.enable:        Enable/disable RLF simulator
+      # rlf.t_on_ms:       Time for On state of the channel (ms)
+      # rlf.t_off_ms:      Time for Off state of the channel (ms)
+      #
+      # -- High Speed Train Doppler model simulator
+      # hst.enable:        Enable/Disable HST simulator
+      # hst.period_s:      HST simulation period in seconds
+      # hst.fd_hz:         Doppler frequency in Hz
+      # hst.init_time_s:   Initial time in seconds
+      #####################################################################
+      [channel.dl]
+      #enable        = false
+      
+      [channel.dl.awgn]
+      #enable        = false
+      #snr            = 30
+      
+      [channel.dl.fading]
+      #enable        = false
+      #model         = none
+      
+      [channel.dl.delay]
+      #enable        = false
+      #period_s      = 3600
+      #init_time_s   = 0
+      #maximum_us    = 100
+      #minimum_us    = 10
+      
+      [channel.dl.rlf]
+      #enable        = false
+      #t_on_ms       = 10000
+      #t_off_ms      = 2000
+      
+      [channel.dl.hst]
+      #enable        = false
+      #period_s      = 7.2
+      #fd_hz         = 750.0
+      #init_time_s   = 0.0
+      
+      [channel.ul]
+      #enable        = false
+      
+      [channel.ul.awgn]
+      #enable        = false
+      #n0            = -30
+      
+      [channel.ul.fading]
+      #enable        = false
+      #model         = none
+      
+      [channel.ul.delay]
+      #enable        = false
+      #period_s      = 3600
+      #init_time_s   = 0
+      #maximum_us    = 100
+      #minimum_us    = 10
+      
+      [channel.ul.rlf]
+      #enable        = false
+      #t_on_ms       = 10000
+      #t_off_ms      = 2000
+      
+      [channel.ul.hst]
+      #enable        = false
+      #period_s      = 7.2
+      #fd_hz         = -750.0
+      #init_time_s   = 0.0
+      
+      
+      #####################################################################
+      # Expert configuration options
+      #
+      # pusch_max_its:        Maximum number of turbo decoder iterations (Default 4)
+      # pusch_8bit_decoder:   Use 8-bit for LLR representation and turbo decoder trellis computation (Experimental)
+      # nof_phy_threads:      Selects the number of PHY threads (maximum 4, minimum 1, default 3)
+      # metrics_period_secs:  Sets the period at which metrics are requested from the eNB. 
+      # metrics_csv_enable:   Write eNB metrics to CSV file.
+      # metrics_csv_filename: File path to use for CSV metrics.
+      # pregenerate_signals:  Pregenerate uplink signals after attach. Improves CPU performance.
+      # tx_amplitude:         Transmit amplitude factor (set 0-1 to reduce PAPR)
+      # rrc_inactivity_timer  Inactivity timeout used to remove UE context from RRC (in milliseconds).
+      # max_prach_offset_us:  Maximum allowed RACH offset (in us)
+      # eea_pref_list:        Ordered preference list for the selection of encryption algorithm (EEA) (default: EEA0, EEA2, EEA1).
+      # eia_pref_list:        Ordered preference list for the selection of integrity algorithm (EIA) (default: EIA2, EIA1, EIA0).
+      #
+      #####################################################################
+      [expert]
+      #pusch_max_its        = 8 # These are half iterations
+      #pusch_8bit_decoder   = false
+      #nof_phy_threads      = 3
+      #metrics_period_secs  = 1
+      #metrics_csv_enable   = false
+      #metrics_csv_filename = /tmp/enb_metrics.csv
+      #pregenerate_signals  = false
+      #tx_amplitude         = 0.6
+      #rrc_inactivity_timer = 30000
+      #max_prach_offset_us  = 30
+      #eea_pref_list = EEA0, EEA2, EEA1
+      #eia_pref_list = EIA2, EIA1, EIA0
+
+  rr.conf: |
+     mac_cnfg =
+     {
+       phr_cnfg = 
+       {
+         dl_pathloss_change = "dB3"; // Valid: 1, 3, 6 or INFINITY
+         periodic_phr_timer = 50;
+         prohibit_phr_timer = 0;
+       };
+       ulsch_cnfg = 
+       {
+         max_harq_tx = 4;
+         periodic_bsr_timer = 20; // in ms
+         retx_bsr_timer = 320;   // in ms
+       };
+       
+       time_alignment_timer = -1; // -1 is infinity
+     };
+     
+     phy_cnfg =
+     {
+       phich_cnfg = 
+       {
+         duration  = "Normal";
+         resources = "1/6"; 
+       };
+     
+       pusch_cnfg_ded =
+       {
+         beta_offset_ack_idx = 6;
+         beta_offset_ri_idx  = 6;
+         beta_offset_cqi_idx = 6;
+       };
+       
+       // PUCCH-SR resources are scheduled on time-frequeny domain first, then multiplexed in the same resource. 
+       sched_request_cnfg =
+       {
+         dsr_trans_max = 64;
+         period = 20;          // in ms
+         //subframe = [1, 11]; // Optional vector of subframe indices allowed for SR transmissions (default uses all)
+         nof_prb = 2;          // number of PRBs on each extreme used for SR (total prb is twice this number)
+       };
+       cqi_report_cnfg =
+       { 
+         mode = "periodic";
+         simultaneousAckCQI = true;
+         period = 40;                   // in ms
+         //subframe = [0, 10, 20, 30];  // Optional vector of subframe indices every period where CQI resources will be allocated (default uses all)
+         nof_prb = 2; 
+         m_ri = 8; // RI period in CQI period
+       };
+     };
+     
+     cell_list =
+     (
+       {
+         // rf_port = 0;
+         cell_id = 0x01;
+         tac = {{TAC}};
+         pci = 1;
+         // root_seq_idx = 204;
+         dl_earfcn = 3350;
+         //ul_earfcn = 21400;
+         ho_active = false;
+     
+         // CA cells
+         scell_list = (
+           // {cell_id = 0x02; cross_carrier_scheduling = false; scheduling_cell_id = 0x02; ul_allowed = true}
+         )
+     
+         // Cells available for handover
+         meas_cell_list =
+         (
+           {
+             eci = 0x19C02;
+             dl_earfcn = 2850;
+             pci = 2;
+           }
+         );
+     
+         // ReportCfg (only A3 supported)
+         meas_report_desc = {
+           a3_report_type = "RSRP";
+           a3_offset = 6;
+           a3_hysteresis = 0;
+           a3_time_to_trigger = 480;
+           rsrq_config = 4;
+         };
+       }
+       // Add here more cells
+     );  
+
+  drb.conf: |
+     qci_config = (
+     
+     {
+       qci=7;
+       pdcp_config = {
+         discard_timer = 100;                
+         pdcp_sn_size = 12;                  
+       }
+       rlc_config = {
+         ul_um = {
+           sn_field_length = 10; 
+         };
+         dl_um = {
+           sn_field_length = 10; 
+           t_reordering    = 45;             
+         };
+       };
+       logical_channel_config = {
+         priority = 13; 
+         prioritized_bit_rate   = -1; 
+         bucket_size_duration  = 100; 
+         log_chan_group = 2; 
+       };
+     },
+     {
+       qci=9;
+       pdcp_config = {
+         discard_timer = -1;
+         status_report_required = true;
+       }
+       rlc_config = {
+         ul_am = {
+           t_poll_retx = 120;
+           poll_pdu = 64;
+           poll_byte = 750;
+           max_retx_thresh = 16;
+         };
+         dl_am = {
+           t_reordering = 50;
+           t_status_prohibit = 50;
+         };
+       };
+       logical_channel_config = {
+         priority = 11; 
+         prioritized_bit_rate   = -1; 
+         bucket_size_duration  = 100; 
+         log_chan_group = 3; 
+       };
+     }
+     
+     );  
+
+  sib.conf: |
+     sib1 =
+     {
+         intra_freq_reselection = "Allowed";
+         q_rx_lev_min = -65;
+         //p_max = 3;
+         cell_barred = "NotBarred"
+         si_window_length = 20;
+         sched_info =
+         (
+             {
+                 si_periodicity = 16;
+     
+                 // comma-separated array of SIB-indexes (from 3 to 13), leave empty or commented to just scheduler sib2
+                 si_mapping_info = [ 3 ];
+             }
+         );
+         system_info_value_tag = 0;
+     };
+     
+     sib2 = 
+     {
+         rr_config_common_sib =
+         {
+             rach_cnfg = 
+             {
+                 num_ra_preambles = 52;
+                 preamble_init_rx_target_pwr = -104;
+                 pwr_ramping_step = 6;  // in dB
+                 preamble_trans_max = 10;
+                 ra_resp_win_size = 10;  // in ms
+                 mac_con_res_timer = 64; // in ms
+                 max_harq_msg3_tx = 4;
+             };
+             bcch_cnfg = 
+             {
+                 modification_period_coeff = 16; // in ms
+             };
+             pcch_cnfg = 
+             {
+                 default_paging_cycle = 32; // in rf
+                 nB = "1";
+             };
+             prach_cnfg =
+             {
+                 root_sequence_index = 128;
+                 prach_cnfg_info =
+                 {
+                     high_speed_flag = false;
+                     prach_config_index = 3;
+                     prach_freq_offset = 2;
+                     zero_correlation_zone_config = 5;
+                 };
+             };
+             pdsch_cnfg = 
+             {
+                 /* Warning: Currently disabled and forced to p_b=1 for TM2/3/4 and p_b=0 for TM1
+                  */
+                 p_b = 1;
+                 rs_power = 0;
+             };
+             pusch_cnfg = 
+             {
+                 n_sb = 1;
+                 hopping_mode = "inter-subframe";
+                 pusch_hopping_offset = 2;
+                 enable_64_qam = false; // 64QAM PUSCH is not currently enabled
+                 ul_rs = 
+                 {
+                     cyclic_shift = 0; 
+                     group_assignment_pusch = 0;
+                     group_hopping_enabled = false; 
+                     sequence_hopping_enabled = false; 
+                 };
+             };
+             pucch_cnfg =
+             {
+                 delta_pucch_shift = 2;
+                 n_rb_cqi = 2;
+                 n_cs_an = 0;
+                 n1_pucch_an = 12;
+             };
+             ul_pwr_ctrl =
+             {
+                 p0_nominal_pusch = -85;
+                 alpha = 0.7;
+                 p0_nominal_pucch = -107;
+                 delta_flist_pucch =
+                 {
+                     format_1  = 0;
+                     format_1b = 3; 
+                     format_2  = 1;
+                     format_2a = 2;
+                     format_2b = 2;
+                 };
+                 delta_preamble_msg3 = 6;
+             };
+             ul_cp_length = "len1";
+         };
+     
+         ue_timers_and_constants =
+         {
+             t300 = 2000; // in ms
+             t301 = 100;  // in ms
+             t310 = 200; // in ms
+             n310 = 1;
+             t311 = 10000; // in ms
+             n311 = 1;
+         };
+     
+         freqInfo = 
+         {
+             ul_carrier_freq_present = true; 
+             ul_bw_present = true; 
+             additional_spectrum_emission = 1; 
+         };
+     
+         time_alignment_timer = "INFINITY"; // use "sf500", "sf750", etc.
+     };
+     
+     sib3 =
+     {
+         cell_reselection_common = {
+             q_hyst = 2; // in dB
+         },
+         cell_reselection_serving = {
+             s_non_intra_search = 3,
+             thresh_serving_low = 2,
+             cell_resel_prio = 6
+         },
+         intra_freq_reselection = {
+             q_rx_lev_min = -61,
+             p_max = 23,
+             s_intra_search = 5,
+             presence_ant_port_1 = true,
+             neigh_cell_cnfg = 1,
+             t_resel_eutra = 1
+         }
+     };
+     
+     #####################################################################
+     # sib7 configuration options (See TS 36.331)
+     # Contains GERAN neighbor information for CSFB and inter-rat handover.
+     # Must be added to sib1::sched_info::si_mapping_info array parameter to be transmitted
+     #
+     # t_resel_geran: Cell reselection timer (seconds)
+     # carrier_freqs_info_list: A list of carrier frequency groups.
+     #     cell_resel_prio: Absolute priority of the carrier frequency group
+     #     ncc_permitted: 8-bit bitmap of NCC carriers permitted for monitoring
+     #     q_rx_lev_min: Minimum receive level in gsm cell, ([field_val] * 2) - 115 = [level in dBm]
+     #     thresh_x_high: Srclev threshold (dB) to select to a higher-priority RAT/Frequency
+     #     thresh_x_low: Srclev threshold (dB) to select to a lower-priority RAT/Frequency
+     #     start_arfcn: Initial search ARFCN value
+     #     band_ind: One of "dcs1800" or "pcs1900" Disambiguates ARFCNs in these bands, has no meaning for other ARFCNs.
+     #     explicit_list_of_arfcns: List of ARFCN numbers in the group
+     #
+     #####################################################################
+     sib7 =
+     {
+         t_resel_geran = 1;
+         carrier_freqs_info_list =
+         (
+             {
+                 cell_resel_prio = 0;
+                 ncc_permitted = 255;
+                 q_rx_lev_min = 0;
+                 thresh_x_high = 2;
+                 thresh_x_low = 2;
+     
+                 start_arfcn = 871;
+                 band_ind = "dcs1800";
+                 explicit_list_of_arfcns = (
+                     871
+                 );
+             }
+         );
+     };
+  ue.conf: |
+     #####################################################################
+     #                   srsUE configuration file
+     #####################################################################
+     
+     #####################################################################
+     # RF configuration
+     #
+     # dl_earfcn: Downlink EARFCN code.
+     # freq_offset: Uplink and Downlink optional frequency offset (in Hz)
+     # tx_gain: Transmit gain (dB). 
+     # rx_gain: Optional receive gain (dB). If disabled, AGC if enabled
+     #
+     # Optional parameters: 
+     # dl_freq:            Override DL frequency corresponding to dl_earfcn
+     # ul_freq:            Override UL frequency corresponding to dl_earfcn
+     # nof_carriers:       Number of carriers
+     # nof_antennas:       Number of antennas per carrier (all carriers have the same number of antennas)
+     # device_name:        Device driver family. Supported options: "auto" (uses first found), "UHD" or "bladeRF" 
+     # device_args:        Arguments for the device driver. Options are "auto" or any string. 
+     #                     Default for UHD: "recv_frame_size=9232,send_frame_size=9232"
+     #                     Default for bladeRF: ""
+     # device_args_2:      Arguments for the RF device driver 2.
+     # device_args_3:      Arguments for the RF device driver 3.
+     # time_adv_nsamples:  Transmission time advance (in number of samples) to compensate for RF delay
+     #                     from antenna to timestamp insertion. 
+     #                     Default "auto". B210 USRP: 100 samples, bladeRF: 27.
+     # continuous_tx:      Transmit samples continuously to the radio or on bursts (auto/yes/no).
+     #                     Default is auto (yes for UHD, no for rest)
+     #####################################################################
+     [rf]
+     device_name = zmq
+     device_args = "tx_port=tcp://*:2001,rx_port=tcp://localhost:2000,id=ue,base_srate=23.04e6"
+     dl_earfcn = 3350
+     freq_offset = 0
+     tx_gain = 80
+     #rx_gain = 40
+     
+     #nof_carriers = 1
+     #nof_antennas = 1
+     
+     # For best performance in 2x2 MIMO and >= 15 MHz use the following device_args settings:
+     #     USRP B210: num_recv_frames=64,num_send_frames=64
+     
+     # For best performance when BW<5 MHz (25 PRB), use the following device_args settings:
+     #     USRP B210: send_frame_size=512,recv_frame_size=512
+     
+     #device_args = auto
+     #time_adv_nsamples = auto
+     #continuous_tx     = auto
+     
+     # Example for ZMQ-based operation with TCP transport for I/Q samples
+     #device_name = zmq
+     #device_args = tx_port=tcp://*:2001,rx_port=tcp://localhost:2000,id=ue,base_srate=23.04e6
+     
+     #####################################################################
+     # Packet capture configuration
+     #
+     # Packet capture is supported at both MAC and NAS layers.
+     # MAC-layer packets are captured to file in the compact format
+     # decoded by the Wireshark mac-lte-framed dissector.
+     # To use this dissector, edit the preferences for DLT_USER to
+     # add an entry with DLT=147, Payload Protocol=mac-lte-framed.
+     # For more information see: https://wiki.wireshark.org/MAC-LTE
+     # NAS-layer packets are dissected with DLT=148, and
+     # Payload Protocol = nas-eps.
+     #
+     # enable:       Enable MAC layer packet captures (true/false)
+     # filename:     File path to use for MAC packet captures
+     # nas_enable:   Enable NAS layer packet captures (true/false)
+     # nas_filename: File path to use for NAS packet captures
+     #####################################################################
+     [pcap]
+     enable = false
+     filename = /tmp/ue.pcap
+     nas_enable = false
+     nas_filename = /tmp/nas.pcap
+     
+     #####################################################################
+     # Log configuration
+     #
+     # Log levels can be set for individual layers. "all_level" sets log
+     # level for all layers unless otherwise configured.
+     # Format: e.g. phy_level = info
+     #
+     # In the same way, packet hex dumps can be limited for each level.
+     # "all_hex_limit" sets the hex limit for all layers unless otherwise
+     # configured.
+     # Format: e.g. phy_hex_limit = 32
+     #
+     # Logging layers: rf, phy, mac, rlc, pdcp, rrc, nas, gw, usim, stack, all
+     # Logging levels: debug, info, warning, error, none
+     #
+     # filename: File path to use for log output. Can be set to stdout
+     #           to print logs to standard output
+     # file_max_size: Maximum file size (in kilobytes). When passed, multiple files are created.
+     #                If set to negative, a single log file will be created.
+     #####################################################################
+     [log]
+     all_level = warning
+     phy_lib_level = none
+     all_hex_limit = 32
+     filename = /tmp/ue.log
+     file_max_size = -1
+     
+     #####################################################################
+     # USIM configuration
+     #
+     # mode:   USIM mode (soft/pcsc)
+     # algo:   Authentication algorithm (xor/milenage)
+     # op/opc: 128-bit Operator Variant Algorithm Configuration Field (hex)
+     #         - Specify either op or opc (only used in milenage)
+     # k:      128-bit subscriber key (hex)
+     # imsi:   15 digit International Mobile Subscriber Identity
+     # imei:   15 digit International Mobile Station Equipment Identity
+     # pin:    PIN in case real SIM card is used
+     # reader: Specify card reader by it's name as listed by 'pcsc_scan'. If empty, try all available readers.
+     #####################################################################
+     [usim]
+     #mode = soft
+     #algo = xor
+     opc  = {{OPC_CODE}}
+     k    = {{SECURITY_KEY}}
+     imsi = {{UE_IMSI}}
+     imei = 353490069873319
+     #reader = 
+     #pin  = 1234
+     
+     #####################################################################
+     # RRC configuration
+     #
+     # ue_category:       Sets UE category (range 1-5). Default: 4
+     # release:           UE Release (8 to 10)
+     # feature_group:     Hex value of the featureGroupIndicators field in the
+     #                    UECapabilityInformation message. Default 0xe6041000
+     # mbms_service_id:   MBMS service id for autostarting MBMS reception
+     #                    (default -1 means disabled)
+     # mbms_service_port: Port of the MBMS service
+     #####################################################################
+     [rrc]
+     #ue_category       = 4
+     #release           = 8
+     #feature_group     = 0xe6041000
+     #mbms_service_id   = -1
+     #mbms_service_port = 4321
+     
+     #####################################################################
+     # NAS configuration
+     #
+     # apn:               Set Access Point Name (APN)
+     # apn_protocol:      Set APN protocol (IPv4, IPv6 or IPv4v6.)
+     # user:              Username for CHAP authentication
+     # pass:              Password for CHAP authentication
+     # force_imsi_attach: Whether to always perform an IMSI attach
+     # eia:               List of integrity algorithms included in UE capabilities
+     #                      Supported: 1 - Snow3G, 2 - AES
+     # eea:               List of ciphering algorithms included in UE capabilities
+     #                      Supported: 0 - NULL, 1 - Snow3G, 2 - AES
+     #####################################################################
+     [nas]
+     #apn = internetinternet
+     #apn_protocol = ipv4
+     #user = srsuser
+     #pass = srspass
+     #force_imsi_attach = false
+     #eia = 1,2
+     #eea = 0,1,2
+     
+     #####################################################################
+     # GW configuration
+     #
+     # netns:                Network namespace to create TUN device. Default: empty
+     # ip_devname:           Name of the tun_srsue device. Default: tun_srsue
+     # ip_netmask:           Netmask of the tun_srsue device. Default: 255.255.255.0
+     #####################################################################
+     [gw]
+     netns = ue1
+     #ip_devname = tun_srsue
+     #ip_netmask = 255.255.255.0
+     
+     #####################################################################
+     # GUI configuration
+     #
+     # Simple GUI displaying PDSCH constellation and channel freq response.
+     # (Requires building with srsGUI)
+     # enable:               Enable the graphical interface (true/false)
+     #####################################################################
+     [gui]
+     enable = false
+     
+     #####################################################################
+     # Channel emulator options:
+     # enable:            Enable/Disable internal Downlink/Uplink channel emulator
+     #
+     # -- AWGN Generator
+     # awgn.enable:       Enable/disable AWGN generator
+     # awgn.snr:          SNR in dB
+     # awgn.signal_power: Received signal power in decibels full scale (dBfs)
+     #
+     # -- Fading emulator
+     # fading.enable:     Enable/disable fading simulator
+     # fading.model:      Fading model + maximum doppler (E.g. none, epa5, eva70, etu300, etc)
+     #
+     # -- Delay Emulator     delay(t) = delay_min + (delay_max - delay_min) * (1 + sin(2pi*t/period)) / 2
+     #                       Maximum speed [m/s]: (delay_max - delay_min) * pi * 300 / period
+     # delay.enable:      Enable/disable delay simulator
+     # delay.period_s:    Delay period in seconds.
+     # delay.init_time_s: Delay initial time in seconds.
+     # delay.maximum_us:  Maximum delay in microseconds
+     # delay.minumum_us:  Minimum delay in microseconds
+     #
+     # -- Radio-Link Failure (RLF) Emulator
+     # rlf.enable:        Enable/disable RLF simulator
+     # rlf.t_on_ms:       Time for On state of the channel (ms)
+     # rlf.t_off_ms:      Time for Off state of the channel (ms)
+     #
+     # -- High Speed Train Doppler model simulator
+     # hst.enable:        Enable/Disable HST simulator
+     # hst.period_s:      HST simulation period in seconds
+     # hst.fd_hz:         Doppler frequency in Hz
+     # hst.init_time_s:   Initial time in seconds
+     #####################################################################
+     [channel.dl]
+     #enable        = false
+     
+     [channel.dl.awgn]
+     #enable        = false
+     #snr           = 30
+     
+     [channel.dl.fading]
+     #enable        = false
+     #model         = none
+     
+     [channel.dl.delay]
+     #enable        = false
+     #period_s      = 3600
+     #init_time_s   = 0
+     #maximum_us    = 100
+     #minimum_us    = 10
+     
+     [channel.dl.rlf]
+     #enable        = false
+     #t_on_ms       = 10000
+     #t_off_ms      = 2000
+     
+     [channel.dl.hst]
+     #enable        = false
+     #period_s      = 7.2
+     #fd_hz         = 750.0
+     #init_time_s   = 0.0
+     
+     [channel.ul]
+     #enable        = false
+     
+     [channel.ul.awgn]
+     #enable        = false
+     #n0            = -30
+     
+     [channel.ul.fading]
+     #enable        = false
+     #model         = none
+     
+     [channel.ul.delay]
+     #enable        = false
+     #period_s      = 3600
+     #init_time_s   = 0
+     #maximum_us    = 100
+     #minimum_us    = 10
+     
+     [channel.ul.rlf]
+     #enable        = false
+     #t_on_ms       = 10000
+     #t_off_ms      = 2000
+     
+     [channel.ul.hst]
+     #enable        = false
+     #period_s      = 7.2
+     #fd_hz         = -750.0
+     #init_time_s   = 0.0
+     
+     #####################################################################
+     # PHY configuration options
+     #
+     # rx_gain_offset:       RX Gain offset to add to rx_gain to calibrate RSRP readings
+     # prach_gain:           PRACH gain (dB). If defined, forces a gain for the tranmsission of PRACH only.,
+     #                       Default is to use tx_gain in [rf] section. 
+     # cqi_max:              Upper bound on the maximum CQI to be reported. Default 15. 
+     # cqi_fixed:            Fixes the reported CQI to a constant value. Default disabled.
+     # snr_ema_coeff:        Sets the SNR exponential moving average coefficient (Default 0.1)
+     # snr_estim_alg:        Sets the noise estimation algorithm. (Default refs)
+     #                          Options: pss:   use difference between received and known pss signal, 
+     #                                   refs:  use difference between noise references and noiseless (after filtering)
+     #                                   empty: use empty subcarriers in the boarder of pss/sss signal
+     # pdsch_max_its:        Maximum number of turbo decoder iterations (Default 4)
+     # pdsch_meas_evm:       Measure PDSCH EVM, increases CPU load (default false)
+     # nof_phy_threads:      Selects the number of PHY threads (maximum 4, minimum 1, default 3)
+     # equalizer_mode:       Selects equalizer mode. Valid modes are: "mmse", "zf" or any 
+     #                       non-negative real number to indicate a regularized zf coefficient.
+     #                       Default is MMSE.
+     # correct_sync_error:   Channel estimator measures and pre-compensates time synchronization error. Increases CPU usage,
+     #                       improves PDSCH decoding in high SFO and high speed UE scenarios.
+     # sfo_ema:              EMA coefficient to average sample offsets used to compute SFO
+     # sfo_correct_period:   Period in ms to correct sample time to adjust for SFO
+     # sss_algorithm:        Selects the SSS estimation algorithm. Can choose between
+     #                       {full, partial, diff}. 
+     # estimator_fil_auto:   The channel estimator smooths the channel estimate with an adaptative filter.
+     # estimator_fil_stddev: Sets the channel estimator smooth gaussian filter standard deviation.
+     # estimator_fil_order:  Sets the channel estimator smooth gaussian filter order (even values perform better).
+     #                       The taps are [w, 1-2w, w]
+     #
+     # snr_to_cqi_offset:    Sets an offset in the SNR to CQI table. This is used to adjust the reported CQI.
+     #
+     # interpolate_subframe_enabled: Interpolates in the time domain the channel estimates within 1 subframe. Default is to average.
+     #
+     # pdsch_csi_enabled:     Stores the Channel State Information and uses it for weightening the softbits. It is only
+     #                        used in TM1. It is True by default.
+     #
+     # pdsch_8bit_decoder:    Use 8-bit for LLR representation and turbo decoder trellis computation (Experimental)
+     # force_ul_amplitude:    Forces the peak amplitude in the PUCCH, PUSCH and SRS (set 0.0 to 1.0, set to 0 or negative for disabling)
+     #
+     # in_sync_rsrp_dbm_th:    RSRP threshold (in dBm) above which the UE considers to be in-sync
+     # in_sync_snr_db_th:      SNR threshold (in dB) above which the UE considers to be in-sync
+     # nof_in_sync_events:     Number of PHY in-sync events before sending an in-sync event to RRC
+     # nof_out_of_sync_events: Number of PHY out-sync events before sending an out-sync event to RRC
+     #
+     #####################################################################
+     [phy]
+     #rx_gain_offset      = 62
+     #prach_gain          = 30
+     #cqi_max             = 15
+     #cqi_fixed           = 10
+     #snr_ema_coeff       = 0.1
+     #snr_estim_alg       = refs
+     #pdsch_max_its       = 8    # These are half iterations
+     #pdsch_meas_evm      = false
+     #nof_phy_threads     = 3
+     #equalizer_mode      = mmse
+     #correct_sync_error  = false
+     #sfo_ema             = 0.1
+     #sfo_correct_period  = 10
+     #sss_algorithm       = full
+     #estimator_fil_auto  = false
+     #estimator_fil_stddev  = 1.0
+     #estimator_fil_order  = 4
+     #snr_to_cqi_offset   = 0.0
+     #interpolate_subframe_enabled = false
+     #pdsch_csi_enabled  = true
+     #pdsch_8bit_decoder = false
+     #force_ul_amplitude = 0
+     
+     #in_sync_rsrp_dbm_th    = -130.0
+     #in_sync_snr_db_th      = 3.0
+     #nof_in_sync_events     = 10
+     #nof_out_of_sync_events = 20
+     
+     #####################################################################
+     # Simulation configuration options
+     #
+     # The UE simulation supports turning on and off airplane mode in the UE.
+     # The actions are carried periodically until the UE is stopped.
+     #
+     # airplane_t_on_ms:   Time to leave airplane mode turned on (in ms)
+     #
+     # airplane_t_off_ms:  Time to leave airplane mode turned off (in ms)
+     #
+     #####################################################################
+     [sim]
+     #airplane_t_on_ms  = -1
+     #airplane_t_off_ms = -1
+     
+     #####################################################################
+     # General configuration options
+     #
+     # metrics_csv_enable:   Write UE metrics to CSV file.
+     #
+     # metrics_period_secs:  Sets the period at which metrics are requested from the UE.
+     #
+     # metrics_csv_filename: File path to use for CSV metrics.
+     #
+     # have_tti_time_stats:  Calculate TTI execution statistics using system clock
+     #
+     #####################################################################
+     [general]
+     #metrics_csv_enable  = false
+     #metrics_period_secs = 1
+     #metrics_csv_filename = /tmp/ue_metrics.csv
+     #have_tti_time_stats = true     
