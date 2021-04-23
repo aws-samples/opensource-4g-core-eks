@@ -22,17 +22,22 @@ spec:
         epc-mode: mme
     spec:
       nodeSelector:
-        nodegroup: control-plane   
+        nodegroup: control-plane
+      initContainers:
+      - name: init-mme
+        image: busybox:1.28
+        command: ['sh', '-c']
+        args:
+        - until nslookup s6a.hss.open5gs.service >> /dev/null; do echo waiting for hss DNS record to be ready;done;
+          until nslookup s11.sgwc.open5gs.service >> /dev/null; do echo waiting for sgwc DNS record to be ready; done;
+          until nslookup s5.smf.open5gs.service >> /dev/null; do echo waiting for smf DNS record to be ready; done;  
       containers:
       - name: mme
         image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
         imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
         command: ["/bin/sh", "-c"]
         args:
-        - until nslookup s6a.hss.open5gs.service >> /dev/null; do echo waiting for hss DNS record to be ready;done;
-          until nslookup s11.sgwc.open5gs.service >> /dev/null; do echo waiting for sgwc DNS record to be ready; done;
-          until nslookup s5.smf.open5gs.service >> /dev/null; do echo waiting for smf DNS record to be ready; done;
-          sleep 10;
+        - sleep 10;
           open5gs-mmed -c /open5gs/config-map/mme.yaml
         volumeMounts:
         - name: open5gs-mme-config

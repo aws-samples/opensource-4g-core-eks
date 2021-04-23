@@ -22,16 +22,21 @@ spec:
         epc-mode: smf
     spec:
       nodeSelector:
-        nodegroup: control-plane    
+        nodegroup: control-plane
+      initContainers:
+      - name: init-smf
+        image: busybox:1.28
+        command: ['sh', '-c']
+        args:
+        - until nslookup gx.pcrf.open5gs.service >> /dev/null; do echo waiting for pcrf DNS record to be ready;done;
+          until nslookup sx.upf.open5gs.service >> /dev/null; do echo waiting for upf DNS record to be ready; done           
       containers:
       - name: smf
         image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
         imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
         command: ["/bin/sh", "-c"]
         args:
-        - until nslookup gx.pcrf.open5gs.service >> /dev/null; do echo waiting for pcrf DNS record to be ready;done;
-          until nslookup sx.upf.open5gs.service >> /dev/null; do echo waiting for upf DNS record to be ready;done;
-          sleep 10;         
+        - sleep 10;         
           open5gs-smfd -c /open5gs/config-map/smf.yaml;
         volumeMounts:
           - name: open5gs-smf-config

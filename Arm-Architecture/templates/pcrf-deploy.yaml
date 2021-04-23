@@ -22,15 +22,18 @@ spec:
         epc-mode: pcrf
     spec:
       nodeSelector:
-        nodegroup: control-plane 
+        nodegroup: control-plane
+      initContainers:
+      - name: init-pcrf
+        image: busybox:1.28
+        command: ['sh', '-c', "until nslookup s5.smf.open5gs.service >> /dev/null; do echo waiting for smf DNS record to be ready; done"]        
       containers:
         - name: pcrf
           image: "{{ .Values.open5gs.image.repository }}:{{ .Values.open5gs.image.tag }}"
           imagePullPolicy: {{ .Values.open5gs.image.pullPolicy }}
           command: ["/bin/sh", "-c"]
           args:
-          - until nslookup s5.smf.open5gs.service >> /dev/null; do echo waiting for smf DNS record to be ready; done;
-            sleep 10;
+          - sleep 10;
             open5gs-pcrfd -c /open5gs/config-map/pcrf.yaml
           volumeMounts:
           - name: open5gs-pcrf-config
