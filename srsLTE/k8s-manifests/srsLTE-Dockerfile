@@ -18,6 +18,9 @@ RUN apt-get update && \
     iputils-ping \
     dnsutils \
     vim \
+    tcpdump \
+    ca-certificates \
+    update-ca-certificates \
     nano \
     git \
     libzmq3-dev
