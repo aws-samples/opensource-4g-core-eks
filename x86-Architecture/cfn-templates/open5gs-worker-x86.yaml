@@ -652,7 +652,6 @@ Resources:
                 "ec2:DescribeInstances",
                 "ec2:DetachNetworkInterface",
                 "ec2:ModifyNetworkInterfaceAttribute",
-                "ec2:DescribeSubnets",
                 "autoscaling:CompleteLifecycleAction",
                 "ec2:DeleteTags",
                 "ec2:DescribeNetworkInterfaces",
@@ -676,7 +675,7 @@ Resources:
   LambdaAttach2ndENI:
     Type: "AWS::Lambda::Function"
     Properties:
-      Runtime: "python3.8"
+      Runtime: "python2.7"
       Handler: "lambda_function.lambda_handler"
       Role: !GetAtt RoleLambdaAttach2ndEniCfn.Arn
       Code:
@@ -685,8 +684,18 @@ Resources:
       Timeout: "60"
       Environment:
         Variables:
-          SubnetIds: !Join [",", [Fn::ImportValue: !Sub "${InfraStackName}-MultusSubnet1Az1", Fn::ImportValue: !Sub "${InfraStackName}-MultusSubnet2Az1"]]
-          SecGroupIds: !Join [",", [Fn::ImportValue: !Sub "${InfraStackName}-MultusSecurityGroup"]]
+          SubnetId1:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSubnet1Az1"
+          SubnetId2:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSubnet2Az1"
+          SecGroupId1:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSecurityGroup"
+          SecGroupId2:
+            Fn::ImportValue:
+              !Sub "${InfraStackName}-MultusSecurityGroup"
 # End of Lambda
 
 # CloudWatch Event Trigger
@@ -747,7 +756,7 @@ Resources:
               cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "CustomResourcePhysicalID")
 
       Handler: index.handler
-      Runtime: "python3.8"
+      Runtime: "python3.6"
       Timeout: "60"
       Role: !GetAtt RoleLambdaAttach2ndEniCfn.Arn
 
