@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: Amazon EKS x86 architecture Multus ready workerndoe group and Auto ConfigMap update.
+Description: Amazon EKS x86 architecture Multus ready workerndoe group and Auto ConfigMap update
 
 Mappings:
   ServicePrincipals:
