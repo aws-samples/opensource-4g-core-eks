@@ -459,6 +459,7 @@ Resources:
       DBClusterIdentifier : Open5gsDocDbCluster
       DBClusterParameterGroupName : !Ref DBParameterGroup
       DBSubnetGroupName : !Ref DBSubnetGroup
+      EngineVersion : 3.6.0
       MasterUsername : !Ref MasterUserName
       MasterUserPassword : !Ref MasterUserPassword
       Port : "27017"
