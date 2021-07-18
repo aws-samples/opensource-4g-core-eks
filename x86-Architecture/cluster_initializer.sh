@@ -8,11 +8,13 @@ echo
 
 kubectl create ns open5gs
 
-echo -e "Creating the needed certificates....\n"
+echo -e "Checking and creating the needed certificates if not already created....\n"
 
 echo
 
 cd ca-tls-certificates
+
+./make_certs.sh
 
 kubectl -n open5gs create secret generic mongodb-ca --from-file=rds-combined-ca-bundle.pem
 
