@@ -2,7 +2,7 @@
 
 #Script to generate required SSL certs
 
-if ls ./*.pem | grep -v rds-combined-ca-bundle.pem 2>/dev/null 1>&2; then
+if ls ./*.pem 2>/dev/null 1>&2; then
    echo "certificates exists..., no need to generate SSL certs"
    exit
 fi
@@ -15,6 +15,8 @@ if [[ ! -f "$FILE" ]]; then
 fi
 
 sudo touch /etc/pki/CA/index.txt
+
+wget https://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem
 
 openssl req  -new -batch -x509 -days 3650 -nodes -newkey rsa:1024 -out ./cacert.pem -keyout cakey.pem -subj /CN=ca.localdomain/C=KO/ST=Seoul/L=Nowon/O=Open5GS/OU=Tests
 openssl genrsa -out ./mme.key.pem 1024
