@@ -20,7 +20,7 @@
  
 **Push images to your ECR:**
 
- docker push container_registry/open5gs-x86-aio:41fd851 -f open5gs-epc-aio
+ docker push container_registry/open5gs-x86-aio:41fd851
  
  docker push container_registry/open5gs-x86-web:41fd851
  
