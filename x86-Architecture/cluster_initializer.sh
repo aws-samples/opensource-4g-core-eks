@@ -40,7 +40,7 @@ echo -e "Installing multus daemonset\n"
 
 echo
 
-kubectl apply -f https://github.com/intel/multus-cni/raw/master/images/multus-daemonset.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
 
 cd ..
 
