@@ -40,7 +40,7 @@ echo -e "Installing multus daemonset\n"
 
 echo
 
-kubectl apply -f https://github.com/intel/multus-cni/raw/master/images/multus-daemonset.yml
+https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/multus/v3.7.2-eksbuild.1/aws-k8s-multus.yaml
 
 cd ..
 
